@@ -3,31 +3,18 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('./authMiddleware')
-// const dotenv = require('dotenv');
+require('dotenv').config();
 const {MongoClient} = require("mongodb");
-require('dotenv').config({path: '.env'});
+//require('dotenv').config({path: '.env'});
 const url = `mongodb://0.0.0.0:27017`;
 const client = new MongoClient(url);
-const db = client.db("test")
+//const db = client.db("test")
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 
 //to send users to the client
-const findUsers = async (db)=>{
-    await client.connect();
-    const collection = db.collection("users");
-    try{
-        const result = await collection.find({}).toArray();
-        //console.log('All users found', result);
-        return result;
-    }catch (err){
-        console.log('Error finding users')
-    }finally{
-        await client.close();
-    }
-}
 
 
 
@@ -60,6 +47,7 @@ const UserSchema = new mongoose.Schema({
 });
 
 const User = mongoose.model('User', UserSchema);
+let refreshTokens = [];
 
 //Register a new user
 app.post('/register', async (req, res)=>{
@@ -104,28 +92,41 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({error: 'Invalid Password'});
         }
         const token = jwt.sign({email: user.email}, process.env.JWT_SECRET, {
-           expiresIn:'1h' ,//Token expires in 1 hour
+           expiresIn:'15m' ,//Token expires in 1 hour
         });
-        res.status(200).json({token});
+        const refreshToken = jwt.sign({email: user.email}, process.env.REFRESH_TOKEN_SEC)
+        refreshTokens.push(refreshToken)
+        res.status(200).json({accessToken: token, refreshToken: refreshToken });
     }catch (err){
         res.status(500).json({error: 'Internal server error'});
     }
 })
+app.post('/refresh-token', (req, res)=>{
+    const refreshToken = req.body.refreshToken;
 
+    if (!refreshToken){
+        return res.status(401).json({error: 'Refresh token not found'});
+        
+    }
+    if (!refreshTokens.includes(refreshToken)){
+        return res.status(403).json({error: "Invalid refresh token"})
+
+    }
+    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SEC, (err, user)=> {
+        if(err){
+            return res.status(403).json({error: 'Invalid refresh token '});
+        }
+        const accessToken = jwt.sign({username: user.username}, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '15m'} );
+        res.json({accessToken: accessToken})
+    })
+})
 app.get('/profile',authMiddleware, async (req, res) => {
-    try{
+    
         //if the authentication middleware succeeds, the user information is available in req.user
         res.status(200).json({user:req.user});
-    }catch (err){
-        return err;
-    }
-})
-app.get('/users', async (req, res)=>{
-    const userss = findUsers(db)
-   await console.log(userss);
-    res.send(userss);
     
 })
+
 
 app.listen(PORT, ()=>{
     console.log(`Server is running on Port ${PORT}`);
