@@ -95,11 +95,15 @@ app.post('/login', async (req, res) => {
            expiresIn:'15m' ,//Token expires in 1 hour
         });
         const refreshToken = jwt.sign({email: user.email}, process.env.REFRESH_TOKEN_SEC)
-        refreshTokens.push(refreshToken)
+        refreshTokens.push(refreshToken)        
         res.status(200).json({accessToken: token, refreshToken: refreshToken });
     }catch (err){
         res.status(500).json({error: 'Internal server error'});
     }
+})
+app.delete('/logout', (req, res)=> {
+    refreshTokens= refreshTokens.filter(refreshToken => refreshToken !== req.body.refreshToken);
+    res.status(204).send("Successfully logged out");
 })
 app.post('/refresh-token', (req, res)=>{
     const refreshToken = req.body.refreshToken;

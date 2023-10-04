@@ -4,7 +4,6 @@ function authMiddleware (req, res, next){
     //Get the token from the request header
     
     const token = req.header('Authorization');
-
     //check if token is missing
     if (!token){
         return res.status(401).json({error: 'Authentication failed: No token provided'});
